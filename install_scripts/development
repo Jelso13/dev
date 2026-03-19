@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+
+# Programming languages and development tools mainly
+
+log_info "=== Starting Development Installation ==="
+
+# ------------------------------------------------------------------------------
+# System Packages (OS Specific)
+# ------------------------------------------------------------------------------
+log_info "Installing system packages..."
+
+# Tools that share the exact same name on both Debian and Arch
+COMMON_TOOLS="g++ clang"
+
+if [[ "$system_type" == "debian" ]]; then
+    system_install $COMMON_TOOLS python3 python3-pip lua5.4 libclang-dev
+elif [[ "$system_type" == "arch" ]]; then
+    system_install $COMMON_TOOLS python python-pip lua luajit llvm
+else
+    log_error "Unsupported system type: $system_type"
+    exit 1
+fi
+
+# ------------------------------------------------------------------------------
+# Rust & Cargo
+# ------------------------------------------------------------------------------
+if command -v rustup &>/dev/null && command -v cargo &>/dev/null; then
+    log_pass "Rust/Cargo is already installed."
+else
+    log_info "Installing Rust toolchain..."
+    
+    if [[ -n "${XDG_DATA_HOME:-}" ]]; then
+        export CARGO_HOME="$XDG_DATA_HOME/cargo"
+        export RUSTUP_HOME="$XDG_DATA_HOME/rustup"
+    fi
+    
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    export PATH="$HOME/.cargo/bin:$PATH"
+fi
+
+# ------------------------------------------------------------------------------
+# Node & NVM
+# ------------------------------------------------------------------------------
+if command -v npm &>/dev/null; then
+    log_pass "NPM is already installed."
+else
+    log_info "Installing NVM and Node 22..."
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+    
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    
+    nvm install 22
+    log_pass "Node version: $(node -v)"
+fi
+
+# ------------------------------------------------------------------------------
+# Starship Prompt
+# ------------------------------------------------------------------------------
+if command -v starship &>/dev/null; then
+    log_pass "Starship is already installed."
+else
+    log_info "Installing Starship..."
+    curl -sS https://starship.rs/install.sh | sh -s -- -y
+fi
+
+# ------------------------------------------------------------------------------
+# Nerd Fonts
+# ------------------------------------------------------------------------------
+FONT_DIR="$HOME/.local/share/fonts"
+if [[ -f "$FONT_DIR/RobotoMonoNerdFont-Regular.ttf" ]]; then
+    log_pass "RobotoMono NerdFont is already installed."
+else
+    log_info "Downloading RobotoMono Nerd Font..."
+    mkdir -p "$FONT_DIR"
+    
+    # Run in a subshell so we don't accidentally change the script's working directory
+    (
+        cd "$FONT_DIR"
+        curl -LO https://github.com/ryanoasis/nerd-fonts/releases/latest/download/RobotoMono.tar.xz
+        tar -xvf RobotoMono.tar.xz
+        rm RobotoMono.tar.xz
+    )
+    # Refresh font cache (Linux)
+    if command -v fc-cache &>/dev/null; then
+        fc-cache -fv
+    fi
+fi
+
+
+
+
+log_info "=== Development Installation Complete ==="
