@@ -73,7 +73,33 @@ get_sys() {
 }
 get_sys
 
-log_debug "system_type = $system_type"
+assert_command() {
+    if command -v "$1" &>/dev/null; then
+        log_info "$1 is available"
+        return 0;
+    else
+        log_warn "$1 is not available"
+        return 1;
+    fi
+}
+
+check_deps() {
+    local missing=()
+    for dep in "$@"; do
+        if ! command -v "$dep" &>/dev/null; then
+            missing+=("$dep")
+        fi
+    done
+
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        log_error "Missing required dependencies: ${RED}${missing[*]}${NC}"
+        return 1
+    fi
+    log_debug "All dependencies met: $*"
+    return 0
+}
+
+
 # ----------------------------- CLI Handling -----------------------------------
 
 while [[ $# -gt 0 ]]; do
@@ -103,6 +129,8 @@ while [[ $# -gt 0 ]]; do
 done
 export VERBOSE
 export DRY_RUN
+
+log_debug "system_type = $system_type"
 
 if [[ ${#POSITIONAL_ARGS[@]} -eq 0 ]]; then
     usage
@@ -136,12 +164,45 @@ done
 
 log_debug "NORMALIZED_TARGETS: ${NORMALIZED_TARGETS[*]}"
 # -------------------------------- Install -------------------------------------
+system_install() {
+    if [[ "$system_type" == "arch" ]]; then
+        if [[ $DRY_RUN -eq 1 ]]; then
+           log_info "[DRY_RUN] Would execute: sudo pacman -S --noconfirm '$@'"
+        else
+            sudo pacman -S --noconfirm "$@"
+        fi 
+    elif [[ "$system_type" == "debian" ]]; then
+        if [[ $DRY_RUN -eq 1 ]]; then
+           log_info "[DRY_RUN] Would execute: sudo apt install -y $@"
+        else
+            sudo apt install -y "$@"
+        fi 
+    else
+        echo "Failed to install $@"
+        exit 1
+    fi
+    return $?
+}
+
 cmd_install() {
     local targets=("$@")
     log_info "Executing: INSTALL"
-    # The :- parameter expansion provides a fallback string if the array is empty
     log_debug "Received targets: ${targets[*]:-(none)}"
+
+    for target in "${targets[@]}"; do
+        local script_path="$PROJECT_ROOT/install_scripts/${target}"
+
+        if [[ -f "$script_path" ]]; then
+            log_info "Running collection: $target"
+            # Source the script so it can use system_install and your loggers
+            source "$script_path"
+            log_pass "Collection '$target' finished."
+        else
+            log_error "No installation script found for: $target"
+        fi 
+    done
 }
+
 # -------------------------------- Config --------------------------------------
 cmd_config() {
     local targets=("$@")
