@@ -1,0 +1,165 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+trap 'echo -e "\x1b[38;2;255;0;0mERROR\x1b[0m: file ${BASH_SOURCE[0]} line $LINENO"; exit 1' ERR
+
+script_dir=$(cd $(dirname "${BASH_SOURCE[0]}") &> /dev/null && pwd)
+export PROJECT_ROOT=$script_dir
+export script_dir
+
+# --------------------------------- Vars ---------------------------------------
+
+declare -i VERBOSE=0
+declare -i DRY_RUN=0
+declare -a POSITIONAL_ARGS
+
+# ------------------------------ Debugging -------------------------------------
+
+RED='\x1b[38;2;255;0;0m'
+GREEN='\x1b[38;2;0;255;0m'
+BOLD='\x1b[1m'
+LIGHTBLUE='\x1b[38;2;5;182;255m'
+NC='\x1b[0m'
+
+FAIL_COUNTER=0
+
+log_pass() { echo -e "${GREEN}[PASS]${NC} $1"; }
+log_fail() { echo -e "${RED}[FAIL]${NC} $1"; (( FAIL_COUNTER++ )); }
+log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+log_info() { echo -e "${BOLD}[INFO]${NC} $1"; }
+log_debug() { if [[ $VERBOSE -eq 1 ]]; then echo -e "${LIGHTBLUE}[DEBUG]${NC} $1"; fi }
+
+# -------------------------------- Utils ---------------------------------------
+
+usage() {
+    cat <<EOF
+Usage: dev [OPTIONS] <command> [targets...]
+
+Commands:
+  install, i    Install base packages and dependencies
+  config, c     Apply dotfiles and configuration scripts
+  refresh, r    Update existing configurations
+
+Options:
+  -h, --help    Show this help message
+  -v, --verbose Enable verbose logging
+  --dry-run     Simulate actions without making changes
+EOF
+}
+
+get_sys() {
+    system_type=$(uname -s)
+    system_type="unknown"
+    if [[ "$(uname -s)" == "Linux" ]]; then
+        if [[ -f /etc/os-release ]]; then
+            source /etc/os-release
+            case "$ID" in #TODO: maybe change this to ID_LIKE
+                debian|ubuntu)
+                    system_type="debian"
+                    ;;
+                arch|manjaro)
+                    system_type="arch"
+                    ;;
+                *)
+                    system_type="linux"
+                    ;;
+            esac
+        else
+            system_type="linux"
+        fi
+    fi
+    #NOTE: can add mac and windows here too
+    export system_type
+}
+get_sys
+
+log_debug "system_type = $system_type"
+# ----------------------------- CLI Handling -----------------------------------
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -v|--verbose)
+            export VERBOSE=1
+            shift # remove flag
+            ;;
+        --dry-run)
+            export DRY_RUN=1
+            shift
+            ;;
+        -*|--*)
+            log_error "Unknown option: $1" >&2
+            usage
+            exit 1
+            ;;
+        *)
+            POSITIONAL_ARGS+=("$1")
+            shift
+            ;;
+    esac
+done
+export VERBOSE
+export DRY_RUN
+
+if [[ ${#POSITIONAL_ARGS[@]} -eq 0 ]]; then
+    usage
+    exit 1
+fi
+
+log_debug "POSITIONAL_ARGS: ${POSITIONAL_ARGS[*]}"
+
+# Substitutions for common targets with multiple names
+declare -A TARGET_MAP=(
+    ["nvim"]="neovim"
+    ["python3"]="python"
+    ["awesome"]="awesomewm"
+)   
+
+COMMAND="${POSITIONAL_ARGS[0]}"
+log_debug "Parsed Command: $COMMAND"
+RAW_TARGETS=("${POSITIONAL_ARGS[@]:1}")
+log_debug "RAW_TARGETS: ${RAW_TARGETS[*]}"
+
+declare -a NORMALIZED_TARGETS=()
+normalize_target() {
+    local input="$1"
+    # swap the key if it exists in the map otherwise do nothing
+    echo "${TARGET_MAP[$input]:-$input}"
+}
+
+for target in "${RAW_TARGETS[@]}"; do
+    NORMALIZED_TARGETS+=("$(normalize_target "$target")")
+done
+
+log_debug "NORMALIZED_TARGETS: ${NORMALIZED_TARGETS[*]}"
+# -------------------------------- Install -------------------------------------
+cmd_install() {
+    local targets=("$@")
+    log_info "Executing: INSTALL"
+    # The :- parameter expansion provides a fallback string if the array is empty
+    log_debug "Received targets: ${targets[*]:-(none)}"
+}
+# -------------------------------- Config --------------------------------------
+cmd_config() {
+    local targets=("$@")
+    log_info "Executing: CONFIG"
+    log_debug "Received targets: ${targets[*]:-(none)}"
+}
+# ---------------------------- Command Handling --------------------------------
+
+case "$COMMAND" in
+    install|i)  
+        cmd_install "${NORMALIZED_TARGETS[@]}" 
+        ;;
+    config|c)   
+        cmd_config "${NORMALIZED_TARGETS[@]}" 
+        ;;
+    *)
+        log_error "Unknown command: '$COMMAND'"
+        echo "Available commands: install (i), config (c), refresh (r)"
+        exit 1
+        ;;
+esac
