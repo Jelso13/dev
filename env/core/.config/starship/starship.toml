@@ -1,0 +1,81 @@
+format = """
+$username\
+$hostname\
+$directory\
+$git_branch\
+$git_state\
+$git_metrics\
+$git_status\
+$line_break\
+${custom.task}\
+$python\
+$character"""
+
+right_format = """
+$cmd_duration\
+"""
+
+
+[character]
+format = '$symbol '
+success_symbol='[❯](bold green)'
+error_symbol='[❮](bold red)'
+vimcmd_symbol = '[❮](bold green)'
+vimcmd_replace_one_symbol = '[❮](bold purple)'
+vimcmd_replace_symbol = '[❮](bold purple)'
+vimcmd_visual_symbol = '[❮](bold yellow)'
+
+[custom.task]
+description = "Show taskwarrior context"
+command = "~/.config/starship/taskwarrior_context.zsh"
+when = "true"
+
+[[battery.display]]
+# upper bound for displaying the battery
+threshold = 20
+style = 'bold red' # make it obvious
+
+[directory]
+truncate_to_repo = true # start path at root of git repo
+format='[$path]($style)[$read_only]($read_only_style) '
+
+# *: This variable can only be used as a part of a style string
+[cmd_duration]
+min_time = 500 # min milliseconds required to show time taken
+format = '[$duration](bold yellow)'
+# show_notifications = true
+# min_time_to_notify = 500 # notify after 45 seconds
+# notification_timeout = 20_000 # do not timeout notification
+
+# LANGUAGES
+[c]
+format = '[$symbol$name $version]($style)'
+
+[python]
+format = "[$virtualenv]($style) "
+style = "bright-black"
+
+
+[git_branch]
+# format = "[$branch]($style)"
+symbol=''
+format = '[$symbol$branch(:$remote_branch)]($style) '
+style = "bright-black"
+# ignore_branches = ["master", "main"]
+truncation_length = 50 # Truncates a git branch to N graphemes.
+truncation_symbol = '…' # The symbol used to indicate a branch name was truncated. You can use '' for no symbol.
+
+[git_status]
+format = "[[(*$conflicted$untracked$modified$staged$renamed$deleted)](218) ($ahead_behind$stashed)]($style)"
+style = "cyan"
+conflicted = "≠"
+untracked = "?"
+modified = "!"
+staged = "+"
+renamed = "»"
+deleted = "✘"
+stashed = "≡"
+
+[git_state]
+format = '\([$state( $progress_current/$progress_total)]($style)\) '
+style = "bright-black"

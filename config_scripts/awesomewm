@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# git@github.com:Jelso13/awesome.git
+
+check_deps awesome || return 1
+
+setup_awesome_config() {
+    local download_dir="$HOME/.config"
+    local target_dir="$download_dir/awesome"
+    local repo_url="git@github.com:Jelso13/awesome.git"
+
+    mkdir --parents "$download_dir"
+
+    if [[ -d "$target_dir/.git" ]]; then
+        log_info "Awesomewm config already exists. Pulling latest changes..."
+        # Use -C to run git inside the target directory without 'cd'-ing
+        git -C "$target_dir" pull
+    else
+        log_info "Cloning Awesomewm config..."
+        git clone "$repo_url" "$target_dir"
+    fi
+}
+
+setup_awesome_config

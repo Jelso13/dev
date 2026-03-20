@@ -14,20 +14,4 @@ style = "Bold"
 family = "Roboto Mono Nerd Font"
 style = "Italic"
 
-[font]
-size = 7
-
-[font.normal]
-family = "Roboto Mono Nerd Font"
-style = "Regular"
-
-[font.bold]
-family = "Roboto Mono Nerd Font"
-style = "Bold"
-
-[font.italic]
-family = "Roboto Mono Nerd Font"
-style = "Italic"
-
-
 

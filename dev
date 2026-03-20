@@ -210,20 +210,17 @@ _gpg_fail_help() {
 
 cmd_secret_export() {
     [[ ! -f "$SECRET_FILE" ]] && { log_error "'$SECRET_FILE' does not exist." >&2; exit 1; }
-    
     export GPG_TTY=$(tty)
-    # Ensure GPG knows which terminal to talk to
     gpg-connect-agent updatestartuptty /bye >/dev/null 2>&1
 
     local tmp
     tmp="$(mktemp)"
-    # Use a localized trap that doesn't interfere with the global ERR trap
     trap 'rm -f "$tmp"' RETURN EXIT INT TERM
 
     log_info "Unlocking secrets..." >&2
 
-    # REMOVED 2>/dev/null so you can see the PINENTRY prompt!
     if ! gpg --quiet --no-symkey-cache --decrypt "$SECRET_FILE" > "$tmp"; then
+    # if ! gpg --quiet --decrypt "$SECRET_FILE" > "$tmp"; then
         rm -f "$tmp"
         if declare -f _gpg_fail_help > /dev/null; then
             _gpg_fail_help
