@@ -10,12 +10,12 @@ log_info "=== Starting Core Installation ==="
 log_info "Installing system packages..."
 
 # Tools that share the exact same name on both Debian and Arch
-COMMON_TOOLS="curl git stow fzf tmux ssh gpg tar"
+COMMON_TOOLS="curl git stow fzf tmux tar jq"
 
 if [[ "$system_type" == "debian" ]]; then
-    system_install $COMMON_TOOLS fd-find xz-utils
+    system_install $COMMON_TOOLS fd-find xz-utils pinentry-curses ssh gpg
 elif [[ "$system_type" == "arch" ]]; then
-    system_install $COMMON_TOOLS fd xz
+    system_install $COMMON_TOOLS fd xz pinentry openssh gnupg
 else
     log_error "Unsupported system type: $system_type"
     exit 1
