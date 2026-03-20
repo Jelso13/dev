@@ -1,0 +1,5 @@
+XDG_DOWNLOAD_DIR="$HOME/Resources/Downloads"
+XDG_TEMPLATES_DIR="$HOME/Resources/Templates"
+XDG_MUSIC_DIR="$HOME/Resources/Media/Music"
+XDG_PICTURES_DIR="$HOME/Resources/Pictures"
+XDG_VIDEOS_DIR="$HOME/Resources/Media/Videos"

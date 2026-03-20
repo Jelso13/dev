@@ -127,6 +127,7 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
 export VERBOSE
 export DRY_RUN
 

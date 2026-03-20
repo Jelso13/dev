@@ -16,6 +16,63 @@ fi
 
 log_pass "Core configuration complete."
 
+
+# ------------------------------------ SSH -------------------------------------
+log_info "=== Configuring SSH & Git ==="
+
+check_deps jq git ssh-keyscan || return 1
+
+mkdir -p "$HOME/.ssh"
+chmod 700 "$HOME/.ssh"
+
+# Idempotent known_hosts check
+if ! ssh-keygen -F github.com &>/dev/null; then
+    log_info "Adding github.com to known_hosts..."
+    if [[ $DRY_RUN -eq 0 ]]; then
+        ssh-keyscan -t ed25519 github.com >> "$HOME/.ssh/known_hosts" 2>/dev/null
+    fi
+else
+    log_pass "github.com is already in known_hosts."
+fi
+
+# 2. Deploy Identity and Keys
+log_info "Unlocking secrets..."
+if SECRETS_JSON=$(cmd_secret_export); then
+    # Extract and Deploy SSH Key
+    SSH_KEY=$(printf "%s\n" "$SECRETS_JSON" | jq -r '.ssh.private_key // empty')
+
+    if [[ -n "$SSH_KEY" ]]; then
+        if [[ $DRY_RUN -eq 0 ]]; then
+            printf "%s\n" "$SSH_KEY" > "$HOME/.ssh/id_rsa"
+            chmod 600 "$HOME/.ssh/id_rsa"
+            log_pass "SSH key deployed."
+        else
+            log_info "[DRY_RUN] Would deploy SSH private key."
+        fi
+    else
+        log_error "ssh.private_key not found in payload."
+    fi
+
+    # Extract and Deploy Git Identity
+    GIT_NAME=$(printf "%s\n" "$SECRETS_JSON" | jq -r '.git.name // empty')
+    GIT_EMAIL=$(printf "%s\n" "$SECRETS_JSON" | jq -r '.git.email // empty')
+
+    if [[ -n "$GIT_NAME" && -n "$GIT_EMAIL" ]]; then
+        if [[ $DRY_RUN -eq 0 ]]; then
+            git config --global user.name "$GIT_NAME"
+            git config --global user.email "$GIT_EMAIL"
+            log_pass "Git configured for $GIT_NAME <$GIT_EMAIL>"
+        else
+            log_info "[DRY_RUN] Would configure Git identity."
+        fi
+    fi
+
+    unset SECRETS_JSON
+else
+    log_error "Failed to decrypt secrets. Skipping SSH key deployment."
+fi
+
+
 # ----------------------------------- NVIM -------------------------------------
 
 assert_command nvim
@@ -38,5 +95,3 @@ setup_nvim_config() {
 }
 
 setup_nvim_config
-
-
