@@ -16,4 +16,8 @@ HISTSIZE=1000
 HISTFILESIZE=2000
 
 
+alias aoei="setxkbmap gb -option 'caps:swapescape'"
+# alias asdf="xmodmap ~/.config/keyboard/xmodmap/xmodmap"
+alias asdf="xkbcomp ~/.config/keyboard/custom.xkb '$DISPLAY'"
+
 eval "$(starship init bash)"
