@@ -1,3 +1,7 @@
+[window]
+# Slight transparency (1.0 is fully opaque, 0.0 is invisible)
+opacity = 0.85
+blur=true
 
 [font]
 size = 7

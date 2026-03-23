@@ -95,3 +95,5 @@ setup_nvim_config() {
 }
 
 setup_nvim_config
+
+
