@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 log_info "=== Configuring Core ==="
 
-
-
 # -------------------------------- Basic Stow ----------------------------------
 
 check_deps stow || return 1

@@ -28,7 +28,7 @@ fi
 
 # ------------------------------------ Tools -----------------------------------
 if [ -d "$HOME/.config/bash/conf.d" ]; then
-    for f in "$HOME/.config/bash/conf.d/"*.bash; do
+    for f in "$HOME/.config/bash/conf.d/"*; do
         source "$f"
     done
 fi

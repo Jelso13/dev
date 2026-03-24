@@ -16,6 +16,7 @@ declare -a POSITIONAL_ARGS
 # ------------------------------ Debugging -------------------------------------
 
 RED='\x1b[38;2;255;0;0m'
+ORANGE='\x1b[38;2;255;160;70m'
 GREEN='\x1b[38;2;0;255;0m'
 BOLD='\x1b[1m'
 LIGHTBLUE='\x1b[38;2;5;182;255m'
@@ -26,6 +27,7 @@ FAIL_COUNTER=0
 log_pass() { echo -e "${GREEN}[PASS]${NC} $1"; }
 log_fail() { echo -e "${RED}[FAIL]${NC} $1"; (( FAIL_COUNTER++ )); }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+log_warn() { echo -e "${ORANGE}[WARN]${NC} $1"; }
 log_info() { echo -e "${BOLD}[INFO]${NC} $1"; }
 log_debug() { if [[ $VERBOSE -eq 1 ]]; then echo -e "${LIGHTBLUE}[DEBUG]${NC} $1"; fi }
 
