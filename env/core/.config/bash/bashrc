@@ -1,0 +1,41 @@
+
+# ---------------------------------- History + Opts ----------------------------
+HISTCONTROL=ignoreboth
+shopt -s histappend checkwinsize
+HISTSIZE=10000
+HISTFILESIZE=20000
+set -o vi
+
+# ------------------------------------ Aliases ---------------------------------
+alias ls='ls --color=auto'
+alias grep='grep --color=auto'
+alias aoei="setxkbmap gb -option 'caps:swapescape'"
+# alias asdf="xmodmap ~/.config/keyboard/xmodmap/xmodmap"
+alias asdf="xkbcomp ~/.config/keyboard/custom.xkb '$DISPLAY'"
+
+# ------------------------------------ Bindings --------------------------------
+# Case-insensitive tab completion
+bind 'set completion-ignore-case on'
+# Execute tmux-sessionizer directly from the prompt
+bind '"\C-f":"tmux-sessionizer\n"'
+if ! shopt -oq posix; then
+    if [ -f /usr/share/bash-completion/bash_completion ]; then
+        . /usr/share/bash-completion/bash_completion
+    elif [ -f /etc/bash_completion ]; then
+        . /etc/bash_completion
+    fi
+fi
+
+# ------------------------------------ Tools -----------------------------------
+if [ -d "$HOME/.config/bash/conf.d" ]; then
+    for f in "$HOME/.config/bash/conf.d/"*.bash; do
+        source "$f"
+    done
+fi
+
+eval "$(starship init bash)"
+
+if command -v fzf &>/dev/null; then
+    eval "$(fzf --bash)"
+fi
+
