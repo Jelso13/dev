@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+
+if [[ $# -eq 1 ]]; then
+    selected=$1
+else
+    # selected=$(find ~/Projects ~/ ~/.config ~/Work -mindepth 1 -maxdepth 1 -type d | fzf)
+    selected=$(find -L ~/Work ~/Development ~/Personal ~/ ~/.config -mindepth 1 -maxdepth 1 -type d | sed "s|$HOME|~|" | fzf)
+fi
+
+if [[ -z $selected ]]; then
+    exit 0
+fi
+
+# Convert the selected path back to the full path
+if [[ $selected == ~* ]]; then
+    full_path=$(echo "$selected" | sed "s|~|$HOME|")
+else
+    full_path=$(realpath "$selected")
+fi
+
+# Convert the selected path name
+selected_name=$(basename "$full_path" | tr . _)
+
+echo "selected_name = $selected_name"
+echo "selected = $selected"
+echo "full_path = $full_path"
+
+
+# selected_name=$(basename "$selected" | tr . _)
+tmux_running=$(pgrep tmux)
+
+# if tmux is not running and there is no tmux session, create a new one
+if [[ -z $TMUX ]] && [[ -z $tmux_running ]]; then
+    # tmux new-session -s $selected_name -c $selected
+    tmux new-session -s $selected_name -c $full_path
+    exit 0
+fi
+
+if ! tmux has-session -t=$selected_name 2> /dev/null; then
+    # tmux new-session -ds $selected_name -c $selected
+    tmux new-session -ds $selected_name -c $full_path
+fi
+
+tmux switch-client -t $selected_name
