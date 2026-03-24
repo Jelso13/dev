@@ -6,6 +6,8 @@ check_deps stow awesome || return 1
 # stow the picom configuration for awesomewm
 system_stow picom
 
+system_stow polybar
+
 if [[ $DRY_RUN -eq 0 ]]; then
     if [[ "$SHELL" != *"zsh"* ]] && command -v zsh &>/dev/null; then
         log_info "Changing default shell to ZSH..."
