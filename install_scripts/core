@@ -29,12 +29,12 @@ log_info "=== Starting Development Installation ==="
 log_info "Installing system packages..."
 
 # Tools that share the exact same name on both Debian and Arch
-COMMON_TOOLS="g++ clang"
+COMMON_TOOLS=" clang"
 
 if [[ "$system_type" == "debian" ]]; then
-    system_install $COMMON_TOOLS python3 python3-pip lua5.4 libclang-dev
+    system_install $COMMON_TOOLS g++ python3 python3-pip lua5.4 libclang-dev
 elif [[ "$system_type" == "arch" ]]; then
-    system_install $COMMON_TOOLS python python-pip lua luajit llvm
+    system_install $COMMON_TOOLS gcc python python-pip lua luajit llvm
 else
     log_error "Unsupported system type: $system_type"
     exit 1
@@ -114,7 +114,7 @@ log_info "=== Development Installation Complete ==="
 
 log_info "=== Starting Neovim Installation ==="
 
-local target_version="0.10.4"
+local target_version="0.12.1"
 
 # -------------------------------- Idempotency ---------------------------------
 

@@ -256,7 +256,7 @@ system_install() {
         if [[ $DRY_RUN -eq 1 ]]; then
            log_info "[DRY_RUN] Would execute: sudo pacman -S --noconfirm '$@'"
         else
-	    log_debug "args: $@"
+	        log_debug "args: $@"
             sudo pacman -S --noconfirm "$@"
         fi 
     elif [[ "$system_type" == "debian" ]]; then
