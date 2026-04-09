@@ -17,8 +17,8 @@ if [[ "$system_type" == "debian" ]]; then
 elif [[ "$system_type" == "arch" ]]; then
     system_install $COMMON_TOOLS fd xz pinentry openssh gnupg
 else
-    log_error "Unsupported system type: $system_type"
-    exit 1
+    system_install $COMMON_TOOLS fd xz-utils pinentry openssh gnupg
+    log_warn "Unsupported system type: $system_type"
 fi
 
 log_info "=== Starting Development Installation ==="
@@ -36,8 +36,8 @@ if [[ "$system_type" == "debian" ]]; then
 elif [[ "$system_type" == "arch" ]]; then
     system_install $COMMON_TOOLS gcc python python-pip lua luajit llvm
 else
-    log_error "Unsupported system type: $system_type"
-    exit 1
+    system_install $COMMON_TOOLS llvm python3 python-pip lua54 clang
+    log_warn "Unsupported system type: $system_type"
 fi
 
 # ------------------------------------------------------------------------------
@@ -139,8 +139,8 @@ elif [[ "$system_type" == "arch" ]]; then
     # Arch uses python-pynvim instead of python3-pynvim
     system_install cmake gettext lua python-pynvim 
 else
-    log_error "Unsupported system type: $system_type"
-    return 1
+    system_install cmake gettext lua5.1 liblua5.1-0-dev python3-pynvim
+    log_warn "Unsupported system type: $system_type"
 fi
 
 check_deps git cargo make cmake g++ || return 1

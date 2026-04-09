@@ -67,7 +67,11 @@ get_sys() {
                     ;;
             esac
         else
-            system_type="linux"
+            if [[ "$(uname -o)" == "Android" ]]; then
+                system_type="android"
+            else
+                system_type="linux"
+            fi
         fi
     fi
     #NOTE: can add mac and windows here too
@@ -264,6 +268,12 @@ system_install() {
            log_info "[DRY_RUN] Would execute: sudo apt install -y $@"
         else
             sudo apt install -y "$@"
+        fi 
+    elif [[ "$system_type" == "android" ]]; then
+        if [[ $DRY_RUN -eq 1 ]]; then
+           log_info "[DRY_RUN] Would execute: pkg install -y $@"
+        else
+            pkg install -y "$@"
         fi 
     else
         echo "Failed to install $@"
