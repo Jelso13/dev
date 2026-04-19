@@ -60,3 +60,5 @@ if [ -d "$ZDOTDIR/conf.d" ]; then
     done
 fi
 
+#pyenv
+eval "$(pyenv virtualenv-init -)"
