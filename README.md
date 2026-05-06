@@ -165,17 +165,47 @@ When you run `./dev config <target>`, the controller does not care where the scr
 
 If multiple plugins have a script with the exact same name, the router executes the **first one it finds** and stops. Namespace your plugin scripts carefully if they share common names!
 
+## 🧪 Testing with Docker
+
+Safely test the dotfiles manager in a persistent, read-only Docker sandbox. 
+
+This repository uses a "Holy Trinity" Docker Compose setup:
+1. **Total Isolation:** Your live repository is mounted as **Read-Only**. Scripts cannot accidentally delete host files, modify your source code, or mess with local permissions.
+2. **Fast Iteration:** Because your host files are mounted, any edits you make to your scripts locally are instantly available inside the container.
+3. **Persistent Downloads:** Heavy installations (like plugins or language servers) are written to a container-only anonymous volume. They survive between testing sessions but will never sync back to clutter your host machine.
+
+### 1. Spin Up Environments
+Start all pre-configured testing containers in the background. Do this once.
+```bash
+cd .docker && docker compose up -d
 ```
 
-***
+### 2. Run Heavy Installs & Test
+Jump into an interactive shell to test. You will be logged in as a standard, non-root user (`tester`). 
+*(Note: Run your heavy install scripts like `./dev install core` once; the downloads will persist as long as the container exists).*
 
-### Next Steps for Implementation
+*   **Debian (Standard Desktop Emulation):**
+    ```bash
+    docker compose exec -it debian bash
+    ```
+*   **Arch Linux (Standard Desktop Emulation):**
+    ```bash
+    docker compose exec -it arch bash
+    ```
+*   **Debian (No Sudo):** Tests error handling when root is unavailable.
+    ```bash
+    docker compose exec -it debian-nosudo bash
+    ```
 
-To make this reality, we will need to update your `dev` script with two new components:
-1. **The Secret Cache Engine:** A small function (`get_secret`) that handles the GPG prompt natively and stores the JSON payload in a local variable for the duration of the script run.
-2. **The Plugin Registry:** A simple `case` statement (or associative array) that maps `dev-desktop` to your actual GitHub URL.
+### 3. Clean Slate Reset
+If an environment gets completely corrupted and you want to wipe it (including all persistent plugin downloads), use the `-v` flag to destroy the anonymous volumes, then restart it:
+```bash
+# Stop, remove the container, AND delete its persistent volumes
+docker compose rm -f -s -v debian
 
-Which one of those two mechanics would you like to build out first?
-
+# Spin up a completely fresh environment
+docker compose up -d debian
 ```
 
+> **Note:** If GPG throws terminal errors during testing, run `export GPG_TTY=$(tty)` inside the container before executing your scripts.
+```

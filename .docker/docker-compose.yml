@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  debian:
+    build:
+      context: .
+      dockerfile: Dockerfile.debian
+    volumes:
+      # 1. Read-only mount of your dotfiles (Protects the host)
+      - ../:/home/tester/dev:ro
+      # 2. Writable anonymous volume (Keeps downloads in the container)
+      # UPDATE THIS PATH to the actual folder your script writes to!
+      - /home/tester/dev/plugins
+    # Keeps the container running in the background indefinitely
+    stdin_open: true 
+    tty: true
+
+  arch:
+    build:
+      context: .
+      dockerfile: Dockerfile.arch
+    volumes:
+      - ../:/home/tester/dev:ro
+      - /home/tester/dev/plugins
+    stdin_open: true
+    tty: true
+
+  debian-nosudo:
+    build:
+      context: .
+      dockerfile: Dockerfile.debian-nosudo
+    volumes:
+      - ../:/home/tester/dev:ro
+      - /home/tester/dev/plugins
+    stdin_open: true
+    tty: true

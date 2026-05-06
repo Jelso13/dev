@@ -31,6 +31,15 @@ log_warn() { echo -e "${ORANGE}[WARN]${NC} $1"; }
 log_info() { echo -e "${BOLD}[INFO]${NC} $1"; }
 log_debug() { if [[ $VERBOSE -eq 1 ]]; then echo -e "${LIGHTBLUE}[DEBUG]${NC} $1"; fi }
 
+# ------------------------------ Load Engine -----------------------------------
+
+if [[ -f "$PROJECT_ROOT/lib/utils.sh" ]]; then
+    source "$PROJECT_ROOT/lib/utils.sh"
+else
+    log_error "Core library missing: lib/utils.sh"
+    exit 1
+fi
+
 # -------------------------------- Utils ---------------------------------------
 
 usage() {
@@ -40,7 +49,7 @@ Usage: dev [OPTIONS] <command> [targets...]
 Commands:
   install, i    Install base packages and dependencies
   config, c     Apply dotfiles and configuration scripts
-  secret, s     Manage encrypted secrets (targets: edit, export)
+  plugin, p     Manage external configuration modules
 
 Options:
   -h, --help    Show this help message
@@ -104,7 +113,6 @@ check_deps() {
     log_debug "All dependencies met: $*"
     return 0
 }
-
 
 # ----------------------------- CLI Handling -----------------------------------
 
@@ -171,88 +179,6 @@ done
 
 log_debug "NORMALIZED_TARGETS: ${NORMALIZED_TARGETS[*]}"
 
-# -------------------------------- Secret --------------------------------------
-
-SECRET_FILE="$PROJECT_ROOT/secret.asc"
-
-cmd_secret_edit() {
-    [[ ! -f "$SECRET_FILE" ]] && { log_error "'$SECRET_FILE' does not exist."; exit 1; }
-
-    local tmp tmp_bak tmp_enc
-    tmp="$(mktemp)"; tmp_bak="$(mktemp)"
-    trap 'rm -f "$tmp" "$tmp_bak"' EXIT INT TERM
-
-    gpg --quiet --no-symkey-cache --decrypt "$SECRET_FILE" > "$tmp" 2>/dev/null || log_error "GPG operation failed. Check ownership of \$(tty) and possibly chown."
-    cp "$tmp" "$tmp_bak"
-
-    "${EDITOR:-vi}" "$tmp"
-
-    if cmp -s "$tmp" "$tmp_bak"; then
-        log_info "No changes made. Exiting without re-encrypting."
-    else
-        log_info "Changes detected. Re-encrypting..."
-        tmp_enc="$(mktemp --suffix=.asc)"
-        
-        gpg --symmetric --cipher-algo AES256 --s2k-digest-algo SHA512 --s2k-count 65011712 \
-            --armor --no-symkey-cache --yes -o "$tmp_enc" "$tmp" 2>/dev/null || log_error "GPG operation failed. Check ownership of \$(tty) and possibly chown."
-        
-        mv -- "$tmp_enc" "$SECRET_FILE"
-        log_pass "Successfully updated secret.asc."
-    fi
-
-    # Cleanup
-    command -v shred >/dev/null 2>&1 && shred -u "$tmp" "$tmp_bak" 2>/dev/null || true
-    trap - EXIT INT TERM
-    rm -f "$tmp" "$tmp_bak"
-}
-
-_gpg_fail_help() {
-    log_error "GPG operation failed." >&2
-    echo -e "\n\x1b[38;2;255;165;0m--- [ TROUBLESHOOTING ] ---\x1b[0m" >&2
-    echo -e "Terminal ownership might be blocked. Try:\n" >&2
-    echo -e "  sudo chown \$(whoami) \$(tty)\n" >&2
-    exit 1
-}
-
-cmd_secret_export() {
-    [[ ! -f "$SECRET_FILE" ]] && { log_error "'$SECRET_FILE' does not exist." >&2; exit 1; }
-    export GPG_TTY=$(tty)
-    gpg-connect-agent updatestartuptty /bye >/dev/null 2>&1
-
-    local tmp
-    tmp="$(mktemp)"
-    trap 'rm -f "$tmp"' RETURN EXIT INT TERM
-
-    log_info "Unlocking secrets..." >&2
-
-    if ! gpg --quiet --no-symkey-cache --decrypt "$SECRET_FILE" > "$tmp"; then
-    # if ! gpg --quiet --decrypt "$SECRET_FILE" > "$tmp"; then
-        rm -f "$tmp"
-        if declare -f _gpg_fail_help > /dev/null; then
-            _gpg_fail_help
-        else
-            log_error "GPG Decryption failed." >&2
-            exit 1
-        fi
-    fi
-
-    cat "$tmp"
-}
-
-cmd_secret() {
-    local args=("$@")
-    local action="${args[0]:-edit}" # Default to edit for convenience
-
-    case "$action" in
-        export) cmd_secret_export ;;
-        edit)   cmd_secret_edit ;;
-        *)
-            log_error "Unknown secret command. Available: edit, export"
-            return 1
-            ;;
-    esac
-}
-
 # -------------------------------- Install -------------------------------------
 
 system_install() {
@@ -260,7 +186,7 @@ system_install() {
         if [[ $DRY_RUN -eq 1 ]]; then
            log_info "[DRY_RUN] Would execute: sudo pacman -S --noconfirm '$@'"
         else
-	        log_debug "args: $@"
+            log_debug "args: $@"
             sudo pacman -S --noconfirm "$@"
         fi 
     elif [[ "$system_type" == "debian" ]]; then
@@ -282,75 +208,177 @@ system_install() {
     return $?
 }
 
-cmd_install() {
-    local targets=("$@")
-    log_info "Executing: INSTALL"
-    log_debug "Received targets: ${targets[*]:-(none)}"
-
-    for target in "${targets[@]}"; do
-        local script_path="$PROJECT_ROOT/install_scripts/${target}"
-
-        if [[ -f "$script_path" ]]; then
-            log_info "Running collection: $target"
-            # Source the script so it can use system_install and your loggers
-            source "$script_path"
-            log_pass "Collection '$target' finished."
-        else
-            log_error "No installation script found for: $target"
-        fi 
-    done
-}
 
 # -------------------------------- Config --------------------------------------
 
 system_stow() {
     local packages=("$@")
+    
+    # 1. Identify the exact directory of the script calling this function
+    local caller_dir
+    caller_dir="$(cd "$(dirname "${BASH_SOURCE[1]}")" && pwd)"
+    
+    # 2. Smart Path Resolution: Find the base directory (Core or Plugin)
+    # This trims everything from "/config_scripts" or "/install_scripts" onward.
+    local base_dir
+    base_dir="${caller_dir%%/config_scripts*}"
+    base_dir="${base_dir%%/install_scripts*}"
+    
+    local env_dir="$base_dir/env"
+
+    # 3. Validate the path before we try to use it
+    if [[ ! -d "$env_dir" ]]; then
+        log_error "Could not locate 'env' directory. Expected at: $env_dir"
+        return 1
+    fi
+
+    # 4. Execute Stow
     if command -v stow &>/dev/null; then
         if [[ $DRY_RUN -eq 1 ]]; then
-            log_info "[DRY_RUN] Would stow: ${packages[*]}"
+            log_info "[DRY_RUN] Would stow: ${packages[*]} from $(basename "$base_dir")/env"
         else
-            log_info "Stowing: ${packages[*]}"
-            # --no-folding will prevent files from being added to ~/.config and them show up in dev
-            stow --no-folding -R -d "$PROJECT_ROOT/env" -t "$HOME" "${packages[@]}"
+            log_info "Stowing: ${packages[*]} from $env_dir"
+            stow --no-folding -R -d "$env_dir" -t "$HOME" "${packages[@]}"
         fi
     else
         log_error "GNU Stow is not installed! Cannot configure ${packages[*]}"
         return 1
     fi
 }
-cmd_config() {
-    local targets=("$@")
-    log_info "Executing: CONFIG"
-    log_debug "Received targets: ${targets[*]:-(none)}"
 
-    for target in "${targets[@]}"; do
-        local script_path="$PROJECT_ROOT/config_scripts/${target}"
-        if [[ -f "$script_path" ]]; then
-            log_info "Running configuration for: $target"
-            source "$script_path"
-            log_pass "Configuration '$target' finished."
-        else
-            log_error "No configuration script found for: $target"
-        fi 
+
+
+# ------------------------------ Execution Router ------------------------------
+
+execute_script() {
+    local script_type="$1" # "install" or "config"
+    local target="$2"
+    
+    local search_paths=("$PROJECT_ROOT")
+    if [[ -d "$PROJECT_ROOT/plugins" ]]; then
+        for plugin in "$PROJECT_ROOT/plugins"/*; do
+            [[ -d "$plugin" ]] && search_paths+=("$plugin")
+        done
+    fi
+
+    for base_path in "${search_paths[@]}"; do
+        local target_path="$base_path/${script_type}_scripts/$target"
+        local origin_name
+        origin_name="$(basename "$base_path")"
+        
+        if [[ -d "$target_path" && -f "$target_path/init.sh" ]]; then
+            log_info "Running $script_type module: $target [via $origin_name]"
+            source "$target_path/init.sh"
+            log_pass "Module '$target' finished."
+            return 0
+        elif [[ -f "$target_path" ]]; then
+            log_info "Running $script_type script: $target [via $origin_name]"
+            source "$target_path"
+            log_pass "Script '$target' finished."
+            return 0
+        fi
     done
+    
+    log_error "No $script_type script/module found for: $target"
+    return 1
 }
 
+cmd_install() {
+    if [[ $# -eq 0 ]]; then
+        log_error "No targets specified for installation."
+        echo "Usage: dev install <target1> [target2...]"
+        return 1
+    fi
+    
+    log_info "Executing: INSTALL"
+    for target in "$@"; do execute_script "install" "$target"; done
+}
+
+cmd_config() {
+    if [[ $# -eq 0 ]]; then
+        log_error "No targets specified for configuration."
+        echo "Usage: dev config <target1> [target2...]"
+        return 1
+    fi
+
+    log_info "Executing: CONFIG"
+    for target in "$@"; do execute_script "config" "$target"; done
+}
+
+# -------------------------------- Plugins -------------------------------------
+
+# Predefined Plugin Registry (Update these URLs with your actual repositories)
+declare -A PLUGIN_REGISTRY=(
+    ["dev-desktop"]="git@github.com:YourUser/dev-desktop.git"
+    ["dev-writing"]="git@github.com:YourUser/dev-writing.git"
+)
+
+cmd_plugin() {
+    local action="${1:-}"
+    local target="${2:-}"
+    local plugins_dir="$PROJECT_ROOT/plugins"
+
+    mkdir -p "$plugins_dir"
+
+    case "$action" in
+        add)
+            if [[ -z "$target" ]]; then
+                log_error "Usage: dev plugin add <plugin-name>"
+                return 1
+            fi
+            
+            local repo_url="${PLUGIN_REGISTRY[$target]:-}"
+            if [[ -z "$repo_url" ]]; then
+                log_error "Plugin '$target' not found in the registry."
+                return 1
+            fi
+
+            if [[ -d "$plugins_dir/$target" ]]; then
+                log_warn "Plugin '$target' is already installed."
+            else
+                log_info "Cloning plugin '$target'..."
+                git clone "$repo_url" "$plugins_dir/$target"
+                log_pass "Plugin '$target' installed and ready to route."
+            fi
+            ;;
+        update)
+            log_info "Updating all plugins..."
+            for plugin in "$plugins_dir"/*; do
+                if [[ -d "$plugin/.git" ]]; then
+                    log_info "Pulling $(basename "$plugin")..."
+                    git -C "$plugin" pull
+                fi
+            done
+            ;;
+        list)
+            log_info "Available plugins in registry:"
+            for key in "${!PLUGIN_REGISTRY[@]}"; do
+                echo "  - $key"
+            done
+            ;;
+        *)
+            log_error "Unknown plugin action. Use: add, update, list"
+            ;;
+    esac
+}
 
 # ---------------------------- Command Handling --------------------------------
 
+# Notice: The 'shift' command has been removed from here!
+
 case "$COMMAND" in
     install|i)  
-        cmd_install "${NORMALIZED_TARGETS[@]}" 
+        cmd_install "${NORMALIZED_TARGETS[@]:-}" 
         ;;
     config|c)   
-        cmd_config "${NORMALIZED_TARGETS[@]}" 
+        cmd_config "${NORMALIZED_TARGETS[@]:-}" 
         ;;
-    secret|s)   
-        cmd_secret "${NORMALIZED_TARGETS[@]}" 
+    plugin|p)
+        cmd_plugin "${RAW_TARGETS[@]:-}"
         ;;
     *)
         log_error "Unknown command: '$COMMAND'"
-        echo "Available commands: install (i), config (c), refresh (r)"
+        echo "Available commands: install (i), config (c), plugin (p)"
         exit 1
         ;;
 esac

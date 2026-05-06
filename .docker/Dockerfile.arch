@@ -1,0 +1,12 @@
+FROM archlinux:base-devel
+
+# Update and install base tools
+RUN pacman -Syu --noconfirm sudo git stow curl wget vim tree
+
+# Create a non-root user with passwordless sudo
+RUN useradd -m -s /bin/bash tester && \
+    echo "tester ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+USER tester
+WORKDIR /home/tester
+COPY --chown=tester:tester . /home/tester/dev
